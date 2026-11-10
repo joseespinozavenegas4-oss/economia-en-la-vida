@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Simulador de decisiones económicas para 1° medio (OA 19): escasez, compra y venta, impuestos y agentes económicos.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>Economía en la vida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:wght@600;800&display=swap">
+<style>
+/* Concepto: videojuego de decisiones. Barra fija con billetera y bienestar como marcadores, un caso por pantalla, tarjetas con borde grueso tipo sticker y colores vivos con texto siempre de alto contraste. */
+:root{
+  --ink:#151232;
+  --bg:#EDF0FF; --surface:#FFFFFF; --surface2:#DEE4FF; --fg:#151232; --muted:#45446B; --edge:#151232; --shadow:#151232;
+  --accent:#3535F0; --accent-fg:#FFFFFF; --accent-soft:#E3E5FF;
+  --sun:#FFD23F; --coral:#FF6B93; --mint:#4DDBB5;
+  --good:#0B7A4B; --good-bg:#D5F6E6; --warn:#7A5600; --warn-bg:#FFEFB8; --bad:#B3123E; --bad-bg:#FFDCE5;
+  --focus:#C2185B;
+  --display:'Bricolage Grotesque',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --fs:17px; --bw:2px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E0C2A; --surface:#1A1747; --surface2:#262367; --fg:#F2F1FF; --muted:#BDBBEA; --edge:#8F8CFF; --shadow:#000000;
+    --accent:#8E8CFF; --accent-fg:#0E0C2A; --accent-soft:#2B2873;
+    --good:#62EDAB; --good-bg:#0F3A2A; --warn:#FFD23F; --warn-bg:#3D3208; --bad:#FF93A9; --bad-bg:#4A1228;
+    --focus:#FFD23F; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E0C2A; --surface:#1A1747; --surface2:#262367; --fg:#F2F1FF; --muted:#BDBBEA; --edge:#8F8CFF; --shadow:#000000;
+  --accent:#8E8CFF; --accent-fg:#0E0C2A; --accent-soft:#2B2873;
+  --good:#62EDAB; --good-bg:#0F3A2A; --warn:#FFD23F; --warn-bg:#3D3208; --bad:#FF93A9; --bad-bg:#4A1228;
+  --focus:#FFD23F; color-scheme:dark;
+}
+:root[data-hc]{ --muted:var(--fg); --bw:3px; --surface2:var(--surface); --accent-soft:var(--surface); }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:var(--fs);line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:4px solid var(--focus);outline-offset:3px;border-radius:8px}
+.wrap{max-width:780px;margin-inline:auto}
+
+/* Barra superior con marcadores */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);
+  margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding-inline:max(16px,env(safe-area-inset-left,0px));
+  border-bottom:var(--bw) solid var(--edge)}
+.top .wrap{display:flex;flex-direction:column;gap:8px;padding-block:10px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.brand{font-family:var(--display);font-weight:800;font-size:1.2em;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.brand i{width:14px;height:14px;border-radius:50%;background:var(--sun);border:var(--bw) solid var(--edge);display:inline-block}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+.tool{background:var(--surface);border:var(--bw) solid var(--edge);border-radius:10px;padding:4px 10px;font-size:.85em;font-weight:700;min-height:38px}
+.tool:hover{background:var(--accent-soft)}
+.tool[aria-pressed="true"],.tool[aria-expanded="true"]{background:var(--accent);color:var(--accent-fg)}
+.hud{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;align-items:end}
+.hud .stat{min-width:0}
+.lbl{font-size:.75em;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.money{display:inline-block;font-family:var(--display);font-weight:800;font-size:1.3em;font-variant-numeric:tabular-nums;
+  background:var(--sun);color:var(--ink);border:var(--bw) solid var(--edge);border-radius:10px;padding:0 10px;margin-top:2px}
+.money.neg{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.meter{height:16px;background:var(--surface2);border-radius:99px;overflow:hidden;border:var(--bw) solid var(--edge);margin-top:6px}
+.meter i{display:block;height:100%;background:var(--good);width:50%;transition:width .5s,background-color .5s}
+.meter[data-lv="good"] i{background:var(--mint)}
+.meter[data-lv="warn"] i{background:var(--sun)}
+.meter[data-lv="bad"] i{background:var(--coral)}
+.wb{font-weight:700;font-variant-numeric:tabular-nums}
+.prog{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:.85em;font-weight:700}
+.dots{display:flex;gap:4px;flex:1}
+.dots b{flex:1;height:8px;border-radius:4px;background:var(--surface2);border:1px solid var(--edge)}
+.dots b.done{background:var(--accent)} .dots b.now{background:var(--sun)}
+
+main{padding-block:22px 8px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:var(--bw) solid var(--edge);box-shadow:5px 5px 0 var(--shadow);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.lvl{display:inline-flex;align-self:flex-start;font-size:.78em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink);border:var(--bw) solid var(--edge);border-radius:99px;padding:3px 12px;background:var(--sun)}
+.lvl.lv1{background:var(--sun)} .lvl.lv2{background:var(--coral)} .lvl.lv3{background:var(--mint)}
+h2{font-size:1.6em;font-weight:800}
+.scene{background:var(--surface2);border:var(--bw) solid var(--edge);border-radius:14px;padding:8px;display:flex;justify-content:center}
+.scene svg{width:100%;max-width:380px;height:auto;display:block}
+.s-a{fill:var(--accent)} .s-b{fill:var(--sun)} .s-c{fill:var(--surface)} .s-d{fill:var(--surface2)} .s-m{fill:var(--mint)} .s-k{fill:var(--coral)}
+.s-l{stroke:var(--edge);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+path.s-l:not([class*="s-a"]):not([class*="s-b"]):not([class*="s-c"]):not([class*="s-d"]){fill:none}
+.s-t{fill:var(--fg);font:700 12px var(--body)}
+.s-bad{stroke:var(--bad);fill:none;stroke-width:4;stroke-linecap:round}
+.story{display:flex;flex-direction:column;gap:12px;max-width:65ch}
+.ask{font-weight:700;font-size:1.1em}
+.term{background:none;border:0;border-bottom:3px dotted var(--accent);color:inherit;padding:0;font-weight:700;cursor:help}
+.ai-note{background:var(--accent-soft);border:var(--bw) solid var(--edge);border-radius:12px;padding:10px 14px;font-size:.95em}
+.tip{background:var(--accent-soft);border:var(--bw) solid var(--edge);border-radius:12px;padding:10px 14px;font-size:.95em}
+.tip b{font-family:var(--display)}
+.tbl{overflow-x:auto;border:var(--bw) solid var(--edge);border-radius:12px}
+.tbl table{border-collapse:collapse;width:100%;min-width:440px;font-size:.92em}
+.tbl th,.tbl td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--edge);font-variant-numeric:tabular-nums}
+.tbl thead th{background:var(--accent);color:var(--accent-fg)}
+.tbl tbody th{background:var(--surface2)}
+.tbl tr:last-child th,.tbl tr:last-child td{border-bottom:0}
+.opts{display:grid;gap:12px;border:0;margin:0;padding:0;min-width:0}
+.opt{display:flex;gap:12px;align-items:flex-start;text-align:left;background:var(--surface);border:var(--bw) solid var(--edge);
+  border-radius:14px;padding:12px 14px;min-height:60px;width:100%;box-shadow:3px 3px 0 var(--shadow)}
+.opt:hover:not(:disabled):not([aria-checked="true"]){background:var(--accent-soft)}
+.opt:active:not(:disabled){transform:translate(2px,2px);box-shadow:1px 1px 0 var(--shadow)}
+.opt[aria-checked="true"]{background:var(--accent);color:var(--accent-fg)}
+.opt[aria-checked="true"] .t span{color:var(--accent-fg)}
+.opt:disabled{cursor:default;box-shadow:none}
+.opt:disabled:not([aria-checked="true"]){opacity:.7}
+.opt .k{flex:none;width:32px;height:32px;border-radius:50%;background:var(--sun);color:var(--ink);border:var(--bw) solid var(--edge);display:grid;place-items:center;font-weight:800;font-family:var(--display)}
+.opt .t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.opt .t strong{font-weight:700}
+.opt .t span{color:var(--muted);font-size:.92em}
+.why label{display:block;font-weight:700;margin-bottom:6px}
+.why textarea{width:100%;min-height:80px;resize:vertical;font:inherit;color:var(--fg);background:var(--surface);
+  border:var(--bw) solid var(--edge);border-radius:12px;padding:10px}
+.btn{background:var(--accent);color:var(--accent-fg);border:var(--bw) solid var(--edge);border-radius:12px;padding:12px 20px;font-weight:800;font-family:var(--display);font-size:1.05em;min-height:50px;align-self:flex-start;box-shadow:4px 4px 0 var(--shadow)}
+.btn:hover:not(:disabled){filter:brightness(1.08)}
+.btn:active:not(:disabled){transform:translate(3px,3px);box-shadow:1px 1px 0 var(--shadow)}
+.btn:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+.btn.alt{background:var(--sun);color:var(--ink)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.fb{border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;border:var(--bw) solid}
+.fb.best{background:var(--good-bg);border-color:var(--good)} .fb.ok{background:var(--warn-bg);border-color:var(--warn)} .fb.risk{background:var(--bad-bg);border-color:var(--bad)}
+.fb h3{font-size:1.15em}
+.fb.best h3{color:var(--good)} .fb.ok h3{color:var(--warn)} .fb.risk h3{color:var(--bad)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border-radius:99px;padding:3px 12px;font-weight:700;font-size:.88em;background:var(--surface);color:var(--fg);border:var(--bw) solid var(--edge);font-variant-numeric:tabular-nums}
+.doc{border:var(--bw) dashed var(--edge);border-radius:14px;padding:12px 16px;background:var(--surface2)}
+.doc h3{font-size:1em;margin-bottom:4px}
+.gloss{background:var(--surface);border:var(--bw) solid var(--edge);box-shadow:5px 5px 0 var(--shadow);border-radius:18px;padding:18px;margin-top:18px}
+.gloss dl{margin:12px 0 0;display:grid;gap:12px}
+.gloss dt{font-weight:800;font-family:var(--display)} .gloss dd{margin:0;color:var(--muted)}
+.end{display:flex;flex-direction:column;gap:8px;border-radius:14px;padding:16px;border:var(--bw) solid}
+.end.best{background:var(--good-bg);border-color:var(--good)} .end.ok{background:var(--warn-bg);border-color:var(--warn)} .end.risk{background:var(--bad-bg);border-color:var(--bad)}
+.end h3{font-size:1.3em}
+.sum{display:grid;gap:10px}
+.sum article{border:var(--bw) solid var(--edge);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px;min-width:0;background:var(--surface)}
+.sum .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tag{font-size:.75em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:99px;padding:2px 10px;border:1px solid}
+.tag.best{background:var(--good-bg);color:var(--good)} .tag.ok{background:var(--warn-bg);color:var(--warn)} .tag.risk{background:var(--bad-bg);color:var(--bad)}
+.sum q{display:block;font-style:italic;color:var(--muted)}
+.small{font-size:.85em;color:var(--muted)}
+.rowtop{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap}
+.linkbtn{background:none;border:0;border-bottom:3px solid var(--accent);color:var(--fg);font-weight:700;padding:2px 0;min-height:36px;align-self:flex-start;border-radius:0}
+.opt:disabled[aria-checked="true"]{opacity:1}
+footer{padding-block:20px;color:var(--muted);font-size:.85em;display:grid;gap:6px}
+@media (max-width:480px){ .tbl table{min-width:0;font-size:.82em} .tbl th,.tbl td{padding:6px 7px} .card{padding:14px;box-shadow:4px 4px 0 var(--shadow)} h2{font-size:1.35em} .tool{padding:4px 8px} }
+@media (prefers-reduced-motion: reduce){ .meter i{transition:none} .opt:active,.btn:active{transform:none} }
+</style>
+
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <div class="brand">Economía en la vida</div>
+      <div class="tools">
+        <button class="tool" id="bGloss" type="button" aria-expanded="false" aria-controls="gloss">Glosario</button>
+        <button class="tool" id="bDoc" type="button" aria-pressed="false">Voz guía (docente)</button>
+        <button class="tool" id="bHc" type="button" aria-pressed="false">Alto contraste</button>
+        <button class="tool" id="bMinus" type="button" aria-label="Letra más pequeña">A−</button>
+        <button class="tool" id="bPlus" type="button" aria-label="Letra más grande">A+</button>
+      </div>
+    </div>
+    <div class="hud" id="hud" hidden>
+      <div class="stat">
+        <div class="lbl">Billetera familiar</div>
+        <div class="money" id="money">$0</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Bienestar <span class="wb" id="wbn">50</span>/100</div>
+        <div class="meter" role="progressbar" aria-label="Bienestar de la familia" aria-valuemin="0" aria-valuemax="100" id="wbm"><i id="wbi"></i></div>
+      </div>
+      <div class="prog"><span id="progt">Caso 1 de 10</span><div class="dots" id="dots"></div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="gloss" id="gloss" hidden aria-label="Glosario">
+    <h2 style="font-size:1.2em">Glosario</h2>
+    <p class="small">Los conceptos subrayados con puntos en cada caso también aparecen aquí.</p>
+    <dl id="glossList"></dl>
+  </section>
+
+  <main id="main" tabindex="-1"></main>
+
+  <footer>
+    <p>Recurso de apoyo para el OA 19 · Historia, Geografía y Ciencias Sociales · 1° medio. Los montos y precios son ejemplos para practicar.</p>
+    <p>Este simulador se hizo con ayuda de inteligencia artificial (Claude) y debe ser revisado por el docente. No pide ni guarda datos de estudiantes.</p>
+  </footer>
+</div>
+
+<script>
+const CLP = (n) => (n < 0 ? '-' : '') + '$' + String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const share = (s, p) => Math.round(Math.max(s.money, 0) * p / 1000) * 1000;
+
+const GLOSS = {
+  escasez: ['Escasez', 'Los recursos (dinero, tiempo, materiales) son limitados, pero las necesidades y deseos de las personas no tienen fin. Por eso siempre hay que elegir.', 'Tienes $5.000 para la semana. Si compras una entrada al cine, ya no te alcanza para otras cosas.'],
+  necesidad: ['Necesidad', 'Algo que hace falta para vivir bien: alimentación, salud, vivienda, educación. Un deseo es algo que nos gustaría tener, pero podemos vivir sin él.', 'Comer, ir al médico y tener útiles escolares son necesidades. Unas zapatillas de marca son un deseo.'],
+  costoop: ['Costo de oportunidad', 'Lo que dejas de hacer o tener cuando eliges una opción. Si usas la plata en una cosa, ya no la puedes usar en otra.', 'Si gastas $10.000 en una salida, el costo de oportunidad es todo lo que no pudiste hacer con esa plata.'],
+  presupuesto: ['Presupuesto', 'Plan que ordena cuánto dinero entra y en qué se va a gastar, para no gastar más de lo que se tiene.', 'Una familia anota que entran $500.000 al mes y los reparte en arriendo, comida, transporte y un poco de ahorro.'],
+  ahorro: ['Ahorro', 'Parte del dinero que se guarda para el futuro o para imprevistos, en vez de gastarla ahora.', 'Guardar $2.000 de tu mesada cada semana para comprar algo más caro después.'],
+  bien: ['Bien y servicio', 'Un bien es algo que se puede tocar. Un servicio es una actividad que hace otra persona.', 'Un pan es un bien. Un corte de pelo o un plan de celular es un servicio.'],
+  oferta: ['Oferta y demanda', 'La oferta es lo que los vendedores ponen a la venta. La demanda es lo que los compradores quieren comprar. El precio se mueve entre ambas: si es muy alto, se compra menos.', 'Si en la feria hay muchas paltas, los vendedores bajan el precio. Si hay pocas, el precio sube.'],
+  costos: ['Costos y ganancia', 'Los costos son todo lo que se gasta para producir algo (ingredientes, gas, envases, tiempo). La ganancia es lo que queda del precio de venta después de pagar los costos.', 'Una torta cuesta $6.000 en ingredientes. Si se vende en $12.000, la ganancia es de $6.000.'],
+  iva: ['IVA', 'Impuesto al Valor Agregado. En Chile es de 19 % y ya viene incluido en el precio de la mayoría de lo que compramos. Lo pagamos todos al comprar y lo recauda el Estado.', 'En un producto de $11.900, unos $1.900 corresponden a IVA.'],
+  boleta: ['Boleta y garantía', 'La boleta es el documento que prueba una compra. Sirve para cambiar o reclamar un producto con falla (garantía) y muestra que se pagó el impuesto.', 'Si unos audífonos fallan a la semana, con la boleta puedes cambiarlos o reclamar.'],
+  credito: ['Crédito e interés', 'Comprar en cuotas es pedir dinero prestado. El interés es lo extra que se paga por usar ese dinero, así que el total pagado es mayor que el precio original.', 'Un celular de $240.000 en 12 cuotas de $28.000 termina costando $336.000.'],
+  agentes: ['Agentes económicos', 'Quienes participan en la economía: las familias (consumen y trabajan), las empresas (producen y contratan) y el Estado (cobra impuestos y entrega servicios).', 'Una familia compra pan (familia), la panadería lo vende (empresa) y paga sus impuestos (Estado).'],
+  flujo: ['Flujo circular', 'Las familias gastan en las empresas; las empresas pagan sueldos a las familias; ambas pagan impuestos al Estado, que los usa en servicios públicos. Todo está conectado.', 'Un supermercado paga sueldos. Con ese sueldo, las familias compran en el supermercado.'],
+  impuestos: ['Impuestos', 'Aportes obligatorios que pagan personas y empresas al Estado. Con ellos se financian colegios, consultorios, calles, seguridad y otros servicios públicos.', 'El IVA que pagas al comprar ayuda a financiar el consultorio y el liceo.'],
+  formal: ['Actividad formal', 'Un negocio que está inscrito ante el Servicio de Impuestos Internos (SII), emite boletas o facturas y paga sus impuestos.', 'Una pastelería que hizo su inicio de actividades y entrega boleta en cada venta.'],
+  imprevisto: ['Imprevisto', 'Gasto que no estaba planeado, como una enfermedad o una reparación urgente. Tener un fondo de reserva ayuda a enfrentarlo.', 'Se echa a perder la lavadora o alguien se enferma justo antes de fin de mes.']
+};
+
+const SCENES = {
+  basket: '<rect class="s-d" x="20" y="88" width="200" height="6" rx="3"/><path class="s-c s-l" d="M70 50h100l-12 38H82z"/><path class="s-l" d="M90 50c0-22 60-22 60 0"/><circle class="s-b s-l" cx="100" cy="40" r="9"/><rect class="s-a s-l" x="118" y="28" width="22" height="22" rx="4"/><text class="s-t" x="172" y="20">$40.000</text><text class="s-t" x="30" y="20">lista &gt; plata</text>',
+  washer: '<rect class="s-c s-l" x="75" y="12" width="90" height="86" rx="10"/><circle class="s-d s-l" cx="120" cy="58" r="26"/><circle class="s-a" cx="120" cy="62" r="12"/><circle class="s-b" cx="92" cy="26" r="5"/><path class="s-l" d="M185 30l22 22m-4-26l-16 16" /><text class="s-t" x="170" y="88">$45.000</text><text class="s-t" x="6" y="44">zapatillas</text><path class="s-l" d="M22 70h44l-6 14H28z"/>',
+  plans: '<rect class="s-c s-l" x="20" y="14" width="64" height="84" rx="10"/><path class="s-a" d="M32 80h8v-8h-8zM46 80h8V64h-8zM60 80h8V54h-8z"/><rect class="s-c s-l" x="100" y="14" width="64" height="84" rx="10"/><path class="s-a" d="M112 80h8v-8h-8zM126 80h8V64h-8zM140 80h8V54h-8z"/><path class="s-b" d="M112 36h40v8h-40z"/><rect class="s-d s-l" x="180" y="14" width="44" height="84" rx="10"/><text class="s-t" x="25" y="32">Básico</text><text class="s-t" x="104" y="32">Libre</text><text class="s-t" x="185" y="60">WiFi</text>',
+  cake: '<rect class="s-d" x="30" y="92" width="180" height="6" rx="3"/><rect class="s-a s-l" x="70" y="62" width="100" height="30" rx="6"/><rect class="s-b s-l" x="85" y="38" width="70" height="24" rx="6"/><path class="s-l" d="M120 38V22"/><circle class="s-b" cx="120" cy="18" r="5"/><text class="s-t" x="176" y="36">costo</text><text class="s-t" x="176" y="52">$6.000</text><text class="s-t" x="22" y="40">¿precio?</text>',
+  phones: '<rect class="s-c s-l" x="28" y="16" width="54" height="82" rx="9"/><circle class="s-d" cx="55" cy="86" r="4"/><rect class="s-c s-l" x="94" y="16" width="54" height="82" rx="9"/><path class="s-l" d="M108 26l14 22-10 14 12 22"/><path class="s-bad" d="M170 36l30 30m0-30l-30 30"/><text class="s-t" x="160" y="90">rota</text>',
+  headphones: '<path class="s-l" d="M52 62c0-40 136-40 136 0"/><rect class="s-a s-l" x="42" y="56" width="26" height="36" rx="10"/><rect class="s-a s-l" x="172" y="56" width="26" height="36" rx="10"/><text class="s-t" x="88" y="22">con boleta</text><text class="s-t" x="92" y="84">garantía</text>',
+  health: '<rect class="s-c s-l" x="70" y="12" width="100" height="86" rx="12"/><path class="s-a" d="M112 30h16v18h18v16h-18v18h-16V64H94V48h18z"/><text class="s-t" x="12" y="60">$45.000</text><text class="s-t" x="182" y="60">¡hoy!</text>',
+  cycle: '<rect class="s-c s-l" x="84" y="6" width="72" height="26" rx="13"/><rect class="s-c s-l" x="8" y="76" width="76" height="26" rx="13"/><rect class="s-c s-l" x="156" y="76" width="76" height="26" rx="13"/><text class="s-t" x="120" y="23" text-anchor="middle">Familias</text><text class="s-t" x="46" y="93" text-anchor="middle">Empresas</text><text class="s-t" x="194" y="93" text-anchor="middle">Estado</text><path class="s-l" d="M96 36L60 70m0 0l3-10m-3 10l10-3M88 89h64m0 0l-9-5m9 5l-9 5M180 70L144 36m0 0l10 3m-10-3l3 10"/>',
+  tax: '<path class="s-c s-l" d="M40 44l80-30 80 30z"/><path class="s-l" d="M52 52v36M88 52v36M124 52v36M160 52v36M196 52v36M40 92h160"/><circle class="s-b s-l" cx="120" cy="34" r="6"/><text class="s-t" x="112" y="106">19 %</text>',
+  wallet: '<rect class="s-a s-l" x="44" y="26" width="152" height="68" rx="12"/><rect class="s-c s-l" x="146" y="48" width="50" height="24" rx="8"/><circle class="s-b s-l" cx="162" cy="60" r="5"/><circle class="s-b s-l" cx="94" cy="16" r="9"/><circle class="s-b s-l" cx="122" cy="12" r="9"/><circle class="s-b s-l" cx="150" cy="16" r="9"/>'
+};
+
+const LEVELS = {
+  1: 'Nivel 1 · Escasez y decisiones',
+  2: 'Nivel 2 · Comprar y vender',
+  3: 'Nivel 3 · Agentes, impuestos y balance'
+};
+
+const cuota = (s) => s.flags.credito ? { dm: -28, dw: 0, note: 'Llegó otra cuota del celular: -$28.000. Todavía quedan cuotas por pagar.' } : null;
+
+const CASES = [
+  {
+    level: 1, scene: 'basket', title: 'La lista del supermercado',
+    intro: () => 'Es sábado. Vas con tu mamá Rosa al supermercado. Esta semana hay $40.000, pero la lista suma $52.000: Tomás pidió galletas, bebida grande y cereal de colores. Esto es la [[escasez]]: la plata no alcanza para todo.',
+    ask: '¿Qué hacen?',
+    opts: [
+      { label: 'Comprar toda la lista', detail: 'Total $52.000, pagan con la tarjeta de la casa', tag: 'risk', dm: -52, dw: 8,
+        fb: () => 'Te pasaste $12.000 del presupuesto de la semana. Ese dinero ya no estará para otras cosas del mes (costo de oportunidad) y, si se paga con tarjeta, podrían pagar intereses.' },
+      { label: 'Priorizar lo básico y elegir un solo gusto', detail: 'Arroz, verduras, proteína y aseo primero. Total $38.000', tag: 'best', dm: -38, dw: 6,
+        fb: () => 'Separaste [[necesidad|necesidades]] de deseos y respetaste el presupuesto. Elegiste un gusto en vez de todos: así se decide frente a la escasez. Además, te sobraron $2.000.' },
+      { label: 'Comprar solo lo más barato de todo, sin comparar', detail: 'Total $30.000', tag: 'ok', dm: -30, dw: -6,
+        fb: () => 'Ahorraste hoy, pero mirar solo el precio puede significar menos calidad y menos alimentos nutritivos. Conviene comparar precio, calidad y necesidad.' }
+    ],
+    doc: { concept: 'Escasez, necesidades y deseos', q: '¿Qué cosas de la lista eran necesidades y cuáles deseos? ¿Todas las familias las clasificarían igual?' }
+  },
+  {
+    level: 1, scene: 'washer', title: 'La devolución de impuestos',
+    intro: () => 'Llegan $60.000 a la cuenta de la familia. Es la devolución de [[impuestos]] que papá pagó de más. Pero hay dos presiones: la lavadora se echó a perder (arreglo: $45.000) y tú quieres unas zapatillas de $55.000.',
+    table: { head: ['Opción', 'Gasto', 'Queda de los $60.000', 'Lavadora'], rows: [
+      ['Comprar zapatillas', '$55.000', '$5.000', 'Sigue rota'],
+      ['Reparar lavadora', '$45.000', '$15.000', 'Arreglada'],
+      ['Guardar todo', '$0', '$60.000', 'Sigue rota (lavandería $35.000 este mes)']
+    ] },
+    ask: 'Compara y decide: ¿qué hacen con la plata?',
+    opts: [
+      { label: 'Comprar las zapatillas', detail: 'Gasto: $55.000', tag: 'risk', dm: 5, dw: 8,
+        fb: () => 'Es un deseo que te da alegría, pero la lavadora sigue rota. El [[costoop|costo de oportunidad]] de las zapatillas fue arreglar algo que toda la familia necesita, y lavar fuera sale caro.' },
+      { label: 'Reparar la lavadora y guardar lo que sobra', detail: 'Gasto: $45.000. Quedan $15.000 en reserva', tag: 'best', dm: 15, dw: 5, flag: 'fondo',
+        fb: () => 'Priorizaste una necesidad de toda la familia y dejaste una reserva para [[imprevisto|imprevistos]]. Renunciaste a las zapatillas por ahora: ese es el costo de oportunidad de tu decisión.' },
+      { label: 'Guardar todo y lavar en la lavandería', detail: 'Se ahorran $60.000, pero lavar este mes cuesta $35.000', tag: 'ok', dm: 25, dw: -5,
+        fb: () => 'Ahorrar es buena idea y este mes sobra más plata, pero la lavadora sigue rota y la lavandería es un gasto que se repite todos los meses. Ahorrar sin resolver una necesidad puede salir más caro después.' }
+    ],
+    doc: { concept: 'Costo de oportunidad', q: '¿A qué renunciaste al elegir? ¿Cambiaría tu decisión si las zapatillas fueran necesarias para educación física?' }
+  },
+  {
+    level: 1, scene: 'plans', title: 'El plan de celular',
+    intro: () => 'Vale necesita un plan de celular para hablar con su mamá y recibir avisos del liceo. Hay WiFi en la casa y en el liceo. Fuera de ahí usa unos 6 GB al mes. Un plan es un [[bien|servicio]] que se paga cada mes.',
+    table: { head: ['Opción', 'Precio mensual', 'Datos', 'Cuándo sirve'], rows: [
+      ['Plan básico', '$10.000', '8 GB', 'Uso moderado fuera del WiFi'],
+      ['Plan libre', '$20.000', 'Sin límite', 'Mucho video sin WiFi'],
+      ['Solo WiFi', '$0', 'Solo con red', 'Si siempre hay red disponible']
+    ] },
+    ask: 'Compara las opciones y decide.',
+    opts: [
+      { label: 'Plan libre', detail: '$20.000 al mes', tag: 'risk', dm: -20, dw: 3,
+        fb: () => 'Tendrías datos de sobra, pero pagas el doble por algo que no usas. Comparar lo que necesitas con lo que ofrece cada opción evita pagar de más.' },
+      { label: 'Plan básico', detail: '$10.000 al mes', tag: 'best', dm: -10, dw: 2,
+        fb: () => 'Cubre tu uso real (6 GB) a la mitad del precio. Comparaste lo que necesitas con lo que cuesta cada opción.' },
+      { label: 'Solo WiFi', detail: '$0 al mes', tag: 'ok', dm: 0, dw: -5,
+        fb: () => 'Ahorras, pero quedarías sin comunicación fuera de casa y del liceo, por ejemplo si tu mamá necesita avisarte algo. Ahorrar tiene un límite cuando se sacrifica una necesidad.' }
+    ],
+    doc: { concept: 'Comparar para decidir', q: '¿Qué criterios usaron además del precio? ¿Cambiaría la decisión si no hubiera WiFi en el liceo?' }
+  },
+  {
+    level: 2, scene: 'cake', title: 'El precio de las tortas',
+    intro: () => 'Rosa prepara 10 tortas para vender esta semana. Cada una le cuesta $6.000 (en total, $60.000) y 3 horas de trabajo. Te pide ayuda con el precio. Piensa en los [[costos|costos]] y en la [[oferta|demanda]]: si el precio es muy alto, los vecinos compran menos.',
+    ask: '¿A qué precio vende cada torta?',
+    opts: [
+      { label: '$6.500', detail: 'Se venden las 10 tortas. Ingreso: $65.000', tag: 'risk', dm: 5, dw: -4,
+        fb: () => 'Vendió todo, pero la ganancia fue de solo $5.000 ($65.000 menos $60.000 de costos) por 30 horas de trabajo. Si sube la harina, Rosa trabajaría a pérdida.' },
+      { label: '$12.000', detail: 'Se venden 8 de 10. Ingreso: $96.000', tag: 'best', dm: 36, dw: 6,
+        fb: () => 'El precio cubre los costos, paga su trabajo y sigue siendo accesible para el barrio. Ingreso $96.000 menos $60.000 de costos: ganancia de $36.000.' },
+      { label: '$25.000', detail: 'Se vende solo 1 de 10. Ingreso: $25.000', tag: 'risk', dm: -35, dw: -2,
+        fb: () => 'A ese precio casi nadie compra (baja la demanda): vendió 1 torta y las otras 9 quedaron sin venderse. Ingreso $25.000 menos $60.000 de costos: perdió $35.000. Un buen precio equilibra lo que cuesta producir y lo que el barrio está dispuesto a pagar.' }
+    ],
+    doc: { concept: 'Costos, oferta y demanda', q: '¿Qué cambiaría si hubiera otra pastelería más barata en la misma cuadra?' }
+  },
+  {
+    level: 2, scene: 'headphones', title: 'Los audífonos',
+    intro: () => 'Los audífonos de Vale se echaron a perder y los necesita para estudiar. En la tienda cuestan $15.990, con [[boleta|boleta]] y garantía. En la feria cuestan $11.000, sin boleta. El precio de la tienda incluye [[iva|IVA]] (19 %): unos $2.553 son impuesto.',
+    table: { head: ['Opción', 'Precio', 'Boleta y garantía', 'Riesgo'], rows: [
+      ['Tienda', '$15.990', 'Sí', 'Más caro hoy'],
+      ['Feria', '$11.000', 'No', 'Si falla, no hay cómo reclamar'],
+      ['Arreglar los viejos', '$3.000', 'Depende del servicio técnico', 'Pueden volver a fallar']
+    ] },
+    ask: 'Compara las opciones y decide.',
+    opts: [
+      { label: 'Comprarlos en la tienda', detail: '$15.990, con boleta y garantía', tag: 'best', dm: -16, dw: 4,
+        fb: () => 'Pagas más, pero si fallan la boleta permite cambiarlos. Además, el IVA que viene en el precio es un aporte a los servicios públicos.' },
+      { label: 'Comprarlos en la feria', detail: '$11.000, sin boleta ni garantía', tag: 'risk', dm: -22, dw: -2,
+        fb: () => 'A la semana fallaron. Sin boleta no hay cambio ni garantía, así que compraste otros: gastaste $22.000 en total, más que en la tienda. Lo barato puede salir caro.' },
+      { label: 'Mandar a arreglar los viejos', detail: 'Cuesta $3.000 en un servicio técnico', tag: 'ok', dm: -3, dw: 0,
+        fb: () => 'Es una opción económica si tiene arreglo. Pero es un parche: si vuelven a fallar, igual tendrás que comprar unos nuevos.' }
+    ],
+    doc: { concept: 'Boleta, garantía e IVA', q: '¿Quién gana y quién pierde cuando se vende sin boleta? ¿Y si el producto falla?' }
+  },
+  {
+    level: 2, scene: 'phones', title: 'El celular de mamá',
+    intro: () => 'El celular de Rosa se rompió y lo usa para recibir pedidos. Una tienda ofrece uno nuevo de $240.000 en 12 cuotas de $28.000. También hay uno reacondicionado, con garantía, a $90.000 al contado. Pagar en cuotas es un [[credito|crédito]].',
+    table: { head: ['Opción', 'Pago hoy', 'Total pagado', 'Detalle'], rows: [
+      ['Nuevo en cuotas', '$28.000', '$336.000', '12 cuotas de $28.000'],
+      ['Reacondicionado', '$90.000', '$90.000', 'Al contado, con garantía'],
+      ['Esperar y ahorrar', '$0', '$90.000', 'Se compra en 3 meses']
+    ] },
+    ask: '¿Qué le conviene a Rosa?',
+    opts: [
+      { label: 'Comprar el nuevo en cuotas', detail: 'Hoy pagan $28.000, pero hay cuota todos los meses', tag: 'risk', dm: -28, dw: 4, flag: 'credito',
+        fb: () => 'Pagarían $336.000 por un celular de $240.000: son $96.000 de interés. Y la cuota se repite 11 meses más, así que cada mes tendrán menos para gastar o ahorrar.' },
+      { label: 'Comprar el reacondicionado al contado', detail: 'Pagan $90.000 hoy, con garantía', tag: 'best', dm: -90, dw: 2,
+        fb: () => 'Resuelve la necesidad (recibir pedidos) sin pagar intereses ni quedar con cuotas. Es un desembolso mayor hoy, pero ningún compromiso futuro.' },
+      { label: 'Esperar 3 meses y ahorrar', detail: 'Mientras tanto, sin celular', tag: 'ok', dm: -15, dw: -3,
+        fb: () => 'Evitas intereses, pero sin celular Rosa pierde pedidos: este mes se perdieron unos $15.000. Esperar tiene un costo de oportunidad cuando la herramienta es parte del trabajo.' }
+    ],
+    doc: { concept: 'Crédito e interés', q: '¿Cuándo vale la pena endeudarse? ¿Qué preguntarían antes de firmar un crédito?' }
+  },
+  {
+    level: 3, scene: 'health', title: 'Un gasto inesperado',
+    pre: cuota,
+    intro: (s) => 'Tomás amanece con fiebre alta. Una consulta particular con exámenes sale $45.000 y no estaba en el presupuesto: es un [[imprevisto]]. ' + (s.flags.fondo ? 'Por suerte, la familia dejó una reserva cuando arregló la lavadora.' : 'La familia no dejó una reserva para estas cosas.'),
+    ask: '¿Qué hacen?',
+    opts: [
+      { label: 'Pagar la consulta particular con la plata de la familia', detail: 'Gasto: $45.000', tag: 'best', dm: -45, dw: (s) => s.flags.fondo ? 3 : -4,
+        fb: (s) => s.flags.fondo ? 'Tenían una reserva y pudieron pagar sin endeudarse ni sacrificar otros gastos. Dejar un fondo para imprevistos fue una buena decisión.' : 'Se atendió a Tomás, que es lo primero. Pero sin reserva hubo que recortar otros gastos del mes y eso se nota. Conviene tener un fondo de imprevistos.' },
+      { label: 'Pedir un préstamo informal ("gota a gota")', detail: 'Les prestan hoy, con intereses muy altos', tag: 'risk', dm: -75, dw: -5,
+        fb: () => 'Resolvieron hoy, pero con ese interés los $45.000 se convirtieron en $75.000. Los préstamos informales son muy caros, suelen cobrar de forma abusiva y pueden volverse una bola de nieve. Un [[credito|crédito]] formal sería más barato.' },
+      { label: 'Ir al consultorio público', detail: 'Gastan $5.000 en remedios, con más tiempo de espera', tag: 'ok', dm: -5, dw: -4,
+        fb: () => 'Es una buena alternativa: la salud pública existe gracias a los [[impuestos]] que pagamos. A cambio, hubo una espera larga y Tomás pasó mal rato; es el costo de oportunidad de ahorrar plata y perder tiempo.' }
+    ],
+    doc: { concept: 'Imprevistos y ahorro', q: '¿Qué otros imprevistos puede tener una familia? ¿Cuánto debería tener una familia como reserva?' }
+  },
+  {
+    level: 3, scene: 'cycle', title: 'Cierra la fábrica del barrio',
+    pre: cuota,
+    intro: () => 'Cierra una fábrica del barrio y varias familias pierden su trabajo. Los vecinos compran menos tortas: las ventas de Rosa bajan 30 %. Es el [[flujo|flujo circular]]: lo que le pasa a un [[agentes|agente económico]] afecta a los demás.',
+    ask: '¿Cómo reacciona Rosa?',
+    opts: [
+      { label: 'Subir el precio para compensar', detail: 'Torta a $15.000', tag: 'risk', dm: -10, dw: -3,
+        fb: () => 'Con vecinos que ya tienen menos ingresos, un precio más alto reduce aún más la demanda. Vendió menos todavía y perdió $10.000 de lo que habría ganado.' },
+      { label: 'Hacer una promoción y ofrecer pedidos al barrio', detail: 'Dos tortas a precio rebajado, entrega a domicilio', tag: 'best', dm: 20, dw: 4,
+        fb: () => 'Adaptó su oferta a la demanda del momento: más accesible, vende más unidades y mantiene su ganancia. Una empresa responde a lo que pasa con las familias de su entorno.' },
+      { label: 'Cerrar la pastelería y buscar trabajo', detail: 'La familia deja de recibir ese ingreso', tag: 'ok', dm: 0, dw: -6,
+        fb: () => 'Puede ser válido si el negocio no tuviera futuro, pero cerrar ante una baja temporal deja a la familia sin esa fuente de ingresos. Antes conviene probar ajustes.' }
+    ],
+    doc: { concept: 'Flujo circular y agentes económicos', q: 'Dibujen el flujo: ¿cómo llega la caída de ventas de Rosa a su proveedora de harina y al Estado?' }
+  },
+  {
+    level: 3, scene: 'tax', title: 'Boleta para el colegio',
+    pre: cuota,
+    intro: () => 'El colegio de Tomás quiere encargarle 40 colaciones a Rosa por $60.000 (los ingredientes cuestan $24.000). Pero pide boleta, y Rosa aún no hizo su inicio de actividades en el SII: no es una [[formal|actividad formal]]. Los [[impuestos]] financian colegios, consultorios y calles.',
+    ask: '¿Qué decide Rosa?',
+    opts: [
+      { label: 'Seguir sin boleta y rechazar el pedido', detail: 'Evita trámites. Ganancia: $0', tag: 'ok', dm: 0, dw: -2,
+        fb: () => 'Evitas trámites, pero pierdes un pedido que dejaba $36.000 de ganancia y a cualquier cliente que pida documento. Sin formalizarse, Rosa tampoco accede a créditos ni beneficios para emprendedores.' },
+      { label: 'Informarse en el SII y formalizar la actividad', detail: 'Acepta el pedido y emite boleta. Ganancia: $36.000', tag: 'best', dm: 36, dw: 5,
+        fb: () => 'Con boleta puede aceptar este pedido y los de futuros clientes que la exigen. Paga impuestos sobre lo que gana, y esos aportes financian servicios que usa toda la familia. El inicio de actividades se hace por internet en sii.cl: conviene revisar allí los pasos y requisitos.' },
+      { label: 'Aceptar solo pedidos pequeños de conocidos, sin boleta', detail: 'Ganancia: $15.000', tag: 'risk', dm: 15, dw: 0,
+        fb: () => 'Gana algo, pero crecer así es difícil: no puede entregar boleta, no tiene respaldo si hay un reclamo y el negocio queda limitado. Además, lo que no se declara no aporta a financiar los servicios públicos.' }
+    ],
+    doc: { concept: 'Impuestos y servicios públicos', q: '¿Qué servicios públicos usaron esta semana sin darse cuenta? ¿Cómo se financian?' }
+  },
+  {
+    level: 3, scene: 'wallet', title: 'Fin de mes',
+    pre: cuota,
+    intro: (s) => 'Termina el mes. La familia hace las cuentas. ' + (s.money > 0 ? 'En la billetera hay ' + CLP(s.money) + '.' : 'La billetera quedó en ' + CLP(s.money) + ': no queda plata para repartir.') + ' Es el momento del [[presupuesto]] y del [[ahorro]].',
+    ask: '¿Qué hacen con lo que queda?',
+    opts: [
+      { label: 'Gastar casi todo en una celebración', detail: (s) => 'Salida, regalos y comida: cerca del 80 % de lo que queda (' + CLP(share(s, 0.8)) + ')', tag: 'risk', dm: (s) => -share(s, 0.8) / 1000, dw: 12,
+        fb: () => 'Fue un día feliz, pero casi vaciaron la billetera: el mes siguiente parte sin reserva y sin plata para imprevistos.' },
+      { label: 'Guardar la mayor parte y gastar un poco en un paseo', detail: (s) => 'Gastan cerca del 20 % (' + CLP(share(s, 0.2)) + ') y guardan el resto', tag: 'best', dm: (s) => -share(s, 0.2) / 1000, dw: 8,
+        fb: () => 'Combina ahorro con bienestar: la familia disfruta algo hoy y mantiene una reserva. Un presupuesto no es solo recortar, también considera lo que da calidad de vida.' },
+      { label: 'Guardar todo y no gastar nada', detail: 'Ahorro máximo', tag: 'ok', dm: 0, dw: -6,
+        fb: () => 'Ahorraron al máximo, pero la familia no tuvo ningún espacio de descanso. Un ahorro que sacrifica el bienestar de todos es difícil de sostener.' }
+    ],
+    doc: { concept: 'Presupuesto y ahorro', q: '¿Qué proporción entre ahorro y gusto les parece razonable? ¿Depende del ingreso de cada familia?' }
+  }
+];
+
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const main = $('main');
+  const TOTAL = CASES.length;
+  const START_MONEY = 250000, GOAL_MONEY = 100000, GOAL_WB = 70;
+  const FS = [15, 17, 19, 21];
+  let fsi = 1;
+  const S = { phase: 'start', i: 0, money: START_MONEY, wb: 50, flags: {}, log: [], sel: null, answered: false, reason: '', doc: false, preFor: -1, preNote: null, introText: '', last: null, review: null };
+
+  const sg = (n) => (n > 0 ? '+' : '') + CLP(n);
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const val = (x) => (typeof x === 'function' ? x(S) : x);
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmt = (t) => esc(t).replace(/\[\[([a-z]+)(?:\|([^\]]+))?\]\]/g, (m, k, label) => {
+    const g = GLOSS[k]; if (!g) return label || k;
+    return '<button type="button" class="term" data-t="' + k + '" aria-label="Ver significado de ' + esc(label || g[0]) + '">' + (label || g[0]) + '</button>';
+  });
+  const plain = (t) => String(t).replace(/\[\[([a-z]+)(?:\|([^\]]+))?\]\]/g, (m, k, label) => label || (GLOSS[k] ? GLOSS[k][0] : k));
+  const TAGS = { best: ['Buena decisión', 'Conveniente'], ok: ['Funciona a medias', 'Parcial'], risk: ['Esta decisión tiene un costo', 'Con costo'] };
+
+  function hud() {
+    const h = $('hud'); h.hidden = S.phase === 'start';
+    const m = $('money'); m.textContent = CLP(S.money); m.classList.toggle('neg', S.money < 0);
+    $('wbn').textContent = S.wb; $('wbi').style.width = S.wb + '%'; $('wbm').setAttribute('aria-valuenow', S.wb);
+    $('wbm').dataset.lv = S.wb >= 60 ? 'good' : (S.wb >= 35 ? 'warn' : 'bad');
+    const shown = S.phase === 'end' ? TOTAL : Math.min(S.i + 1, TOTAL);
+    $('progt').textContent = S.phase === 'end' ? 'Final' : 'Caso ' + shown + ' de ' + TOTAL;
+    $('dots').innerHTML = CASES.map((c, k) => '<b class="' + (k < S.i || (k === S.i && S.answered) || S.phase === 'end' ? 'done' : (k === S.i ? 'now' : '')) + '"></b>').join('');
+  }
+
+  function docBox(c) {
+    return S.doc && c.doc ? '<div class="doc"><h3>Voz guía · pregunta para conversar</h3><p><b>' + esc(c.doc.concept) + '.</b> ' + esc(c.doc.q) + '</p></div>' : '';
+  }
+
+  function renderStart() {
+    main.innerHTML = '<section class="card">' +
+      '<span class="lvl lv1">Simulador · OA 19</span>' +
+      '<h2>Economía en la vida</h2>' +
+      '<div class="scene"><svg viewBox="0 0 240 110" role="img" aria-label="Billetera familiar">' + SCENES.wallet + '</svg></div>' +
+      '<div class="ai-note" role="note"><b>Antes de empezar:</b> este simulador fue creado con ayuda de inteligencia artificial (Claude) y revisado por tu profesor. No te pide ni guarda tus datos personales.</div>' +
+      '<div class="story"><p>Vale tiene 15 años. Vive con su mamá Rosa, que vende tortas en el barrio, su papá, que trabaja como técnico, y su hermano Tomás, de 8. Durante un mes vas a ser la voz que ayuda a Vale a decidir qué hacer con la billetera de la familia.</p>' +
+      '<p><b>Misión:</b> terminar el mes con al menos ' + CLP(GOAL_MONEY) + ' en la billetera y un bienestar de ' + GOAL_WB + ' o más. Parten con ' + CLP(START_MONEY) + ' disponibles, después de pagar los gastos fijos (arriendo y cuentas básicas).</p></div>' +
+      '<div class="tip"><b>Instrucciones.</b> Lee atentamente cada situación y contesta en base a tu conocimiento. Cada caso te pondrá un reto, piensa bien antes de decidir. Elige una opción, explica por qué con tus palabras y confirma. No hay límite de tiempo y puedes releer los casos anteriores. Los conceptos subrayados tienen su significado y un ejemplo en el glosario.</div>' +
+      (S.doc ? '<div class="doc"><h3>Voz guía · notas para el docente</h3><p>Uso sugerido en el desarrollo y cierre de la clase: detenerse después de cada caso para conversar (la pregunta aparece al responder). Son 10 casos en 3 niveles; considera dos bloques de clase. Contrastar contenidos y montos con los textos de apoyo del curso (por ejemplo, Economía para principiantes y Economía para todos) y con el programa de estudio del OA 19.</p></div>' : '') +
+      '<button class="btn" id="go" type="button">Comenzar el mes</button></section>';
+    $('go').addEventListener('click', () => { S.phase = 'case'; render(); });
+  }
+
+  function enterCase() {
+    if (S.preFor === S.i) return;
+    const c = CASES[S.i]; S.preFor = S.i; S.preNote = null;
+    S.sel = null; S.answered = false; S.reason = ''; S.last = null;
+    const p = c.pre ? c.pre(S) : null;
+    S.preDm = p ? p.dm * 1000 : 0;
+    if (p) { S.money += S.preDm; S.wb = clamp(S.wb + (p.dw || 0), 0, 100); S.preNote = p.note; }
+    S.introText = c.intro(S);
+    S.optsText = c.opts.map((o) => ({ label: val(o.label), detail: val(o.detail) }));
+  }
+
+  function renderCase() {
+    enterCase();
+    const c = CASES[S.i];
+    let h = '<section class="card"><div class="rowtop"><span class="lvl lv' + c.level + '">' + esc(LEVELS[c.level]) + '</span>' + (S.i > 0 ? '<button type="button" class="linkbtn" id="reread">← Releer casos anteriores</button>' : '') + '</div><h2>' + esc(c.title) + '</h2>' +
+      '<div class="scene"><svg viewBox="0 0 240 110" role="img" aria-label="Ilustración del caso: ' + esc(c.title) + '">' + SCENES[c.scene] + '</svg></div>' +
+      '<div class="story"><p>' + fmt(S.introText) + '</p>' + (S.preNote ? '<div class="tip"><b>Cuenta pendiente.</b> ' + esc(S.preNote) + '</div>' : '') + '</div>' +
+      '<div id="tipbox"></div>';
+    if (c.table) {
+      h += '<div class="tbl"><table><thead><tr>' + c.table.head.map((x) => '<th scope="col">' + esc(x) + '</th>').join('') + '</tr></thead><tbody>' +
+        c.table.rows.map((r) => '<tr>' + r.map((x, k) => k === 0 ? '<th scope="row">' + esc(x) + '</th>' : '<td>' + esc(x) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+    }
+    h += '<p class="ask" id="askt">' + esc(c.ask) + '</p><div class="opts" role="radiogroup" aria-labelledby="askt">';
+    c.opts.forEach((o, k) => {
+      const tab = (S.sel === k || (S.sel === null && k === 0)) ? 0 : -1;
+      h += '<button type="button" role="radio" class="opt" data-k="' + k + '" tabindex="' + tab + '" aria-checked="' + (S.sel === k) + '"' + (S.answered ? ' disabled' : '') + '><span class="k">' + 'ABC'[k] + '</span><span class="t"><strong>' + esc(S.optsText[k].label) + '</strong><span>' + esc(S.optsText[k].detail) + '</span></span></button>';
+    });
+    h += '</div>';
+    if (!S.answered) {
+      h += '<div class="why"><label for="why">Explica con tus palabras por qué elegiste esa opción. Puedes escribirlo o, si prefieres, decírselo a tu profesor en voz alta.</label><textarea id="why" placeholder="Porque...">' + esc(S.reason) + '</textarea></div>' +
+        '<button class="btn" id="ok" type="button"' + (S.sel === null ? ' disabled' : '') + '>Confirmar decisión</button>';
+    } else {
+      const L = S.last;
+      h += '<div class="fb ' + L.tag + '"><h3 id="fbh" tabindex="-1">' + TAGS[L.tag][0] + '</h3><p>' + fmt(L.fb) + '</p>' +
+        '<div class="chips"><span class="chip ' + (L.dm >= 0 ? 'up' : 'down') + '">Billetera ' + sg(L.dm) + '</span><span class="chip ' + (L.dw >= 0 ? 'up' : 'down') + '">Bienestar ' + (L.dw > 0 ? '+' : '') + L.dw + '</span></div>' +
+        (L.tag !== 'best' ? '<p class="small">La opción más conveniente era: <b>' + esc(S.optsText[c.opts.findIndex((o) => o.tag === 'best')].label) + '</b>.</p>' : '') + '</div>' +
+        docBox(c) +
+        '<button class="btn" id="next" type="button">' + (S.i === TOTAL - 1 ? 'Ver el final del mes' : 'Siguiente caso') + '</button>';
+    }
+    main.innerHTML = h + '</section>';
+  }
+
+  function confirmChoice() {
+    const c = CASES[S.i], o = c.opts[S.sel];
+    const dm = val(o.dm) * 1000, dw = val(o.dw), fb = o.fb(S);
+    S.money += dm; S.wb = clamp(S.wb + dw, 0, 100);
+    if (o.flag) S.flags[o.flag] = true;
+    S.last = { tag: o.tag, fb, dm, dw };
+    S.log.push({ title: c.title, level: c.level, label: S.optsText[S.sel].label, tag: o.tag, idx: S.i, preDm: S.preDm, intro: S.introText, optsText: S.optsText, selIdx: S.sel, fbRaw: fb, reason: S.reason.trim(), fb: plain(fb), dm, dw, pre: S.preNote });
+    S.answered = true; hud(); render();
+    const f = $('fbh'); if (f) f.focus();
+  }
+
+  function ending() {
+    if (S.money >= GOAL_MONEY && S.wb >= GOAL_WB) return ['best', 'Mes en verde', 'Terminaron con plata en la billetera y la familia está bien. Tus decisiones combinaron necesidades, ahorro y bienestar.'];
+    if (S.money >= 30000 && S.wb >= 40) return ['ok', 'Mes ajustado', 'Llegaron a fin de mes, pero con poco margen. Revisa en el resumen qué decisiones tuvieron un costo y qué harías distinto.'];
+    return ['risk', 'Mes en rojo', 'Este mes la billetera o el bienestar quedaron muy bajos. Es un simulador, así que sirve para aprender: busca el momento clave en el resumen y vuelve a intentarlo.'];
+  }
+
+  function summaryText() {
+    const e = ending();
+    let t = 'Economía en la vida · resumen de mis decisiones\n' + e[1] + ' · Billetera final ' + CLP(S.money) + ' · Bienestar ' + S.wb + '/100\n\n';
+    S.log.forEach((l, k) => {
+      t += (k + 1) + '. ' + l.title + '\nDecisión: ' + l.label + ' (' + TAGS[l.tag][1] + ')\n' + (l.reason ? 'Mi razón: ' + l.reason + '\n' : '') + 'Billetera: ' + (l.preDm ? 'cuota del celular ' + sg(l.preDm) + ' + ' : '') + 'decisión ' + sg(l.dm) + '\n' + 'Retroalimentación: ' + l.fb + '\n\n';
+    });
+    return t.trim();
+  }
+
+  function accountsHtml() {
+    let acc = START_MONEY;
+    let rows = '<tr><th scope="row">Al empezar el mes</th><td>—</td><td>—</td><td>' + CLP(acc) + '</td></tr>';
+    S.log.forEach((l, k) => {
+      acc += l.preDm + l.dm;
+      rows += '<tr><th scope="row">' + (k + 1) + '. ' + esc(l.title) + '</th><td>' + (l.preDm ? sg(l.preDm) : '—') + '</td><td>' + sg(l.dm) + '</td><td>' + CLP(acc) + '</td></tr>';
+    });
+    rows += '<tr><th scope="row">Al terminar el mes</th><td colspan="2">Cuotas que llegaron después de comprar: ' + CLP(S.log.reduce((t, l) => t + l.preDm, 0)) + '</td><td><b id="finalMoney">' + CLP(S.money) + '</b></td></tr>';
+    return '<h3>Cuentas del mes</h3><div class="tbl"><table><thead><tr><th scope="col">Caso</th><th scope="col">Cuota celular</th><th scope="col">Decisión</th><th scope="col">Billetera</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function renderEnd() {
+    const e = ending(), met = S.money >= GOAL_MONEY && S.wb >= GOAL_WB;
+    let h = '<section class="card"><span class="lvl">Final</span><h2>Resumen del mes</h2>' +
+      '<div class="end ' + e[0] + '"><h3>' + e[1] + '</h3><p>' + e[2] + '</p>' +
+      '<div class="chips"><span class="chip">Billetera final ' + CLP(S.money) + '</span><span class="chip">Bienestar ' + S.wb + '/100</span><span class="chip">Misión ' + (met ? 'lograda' : 'no lograda') + '</span></div></div>' +
+      accountsHtml() + '<div class="tip"><b>Para pensar.</b> Elige la decisión que cambiarías y explica en tu cuaderno qué consecuencia económica habría tenido el cambio.</div>' +
+      '<div class="sum">';
+    S.log.forEach((l, k) => {
+      h += '<article><div class="h"><strong>' + (k + 1) + '. ' + esc(l.title) + '</strong><span class="tag ' + l.tag + '">' + TAGS[l.tag][1] + '</span></div>' +
+        '<span>' + esc(l.label) + '</span><span class="small"><b>Billetera:</b> ' + (l.preDm ? 'cuota del celular ' + sg(l.preDm) + ' + ' : '') + 'decisión ' + sg(l.dm) + ' = ' + sg(l.preDm + l.dm) + ' · <b>Bienestar</b> ' + (l.dw > 0 ? '+' : '') + l.dw + '</span>' + (l.reason ? '<q>' + esc(l.reason) + '</q>' : '') + '<span class="small">' + esc(l.fb) + '</span><button type="button" class="linkbtn" data-rv="' + k + '">Releer este caso</button></article>';
+    });
+    h += '</div>' + (S.doc ? '<div class="doc"><h3>Voz guía · cierre</h3><p>Pida a cada estudiante que lea una decisión que cambiaría y explique por qué. Luego conecten con el OA: ¿qué decisiones dependían de la escasez, cuáles de la relación entre familias, empresas y Estado?</p></div>' : '') +
+      '<div class="row"><button class="btn" id="copy" type="button">Copiar resumen</button><button class="btn alt" id="again" type="button">Volver a jugar</button></div>' +
+      '<p class="small" id="copyMsg" role="status">Copia el resumen y pégalo en un documento para entregarlo.</p><textarea id="copyArea" readonly hidden style="width:100%;min-height:140px"></textarea></section>';
+    main.innerHTML = h;
+  }
+
+  function tableHtml(c) {
+    return '<div class="tbl"><table><thead><tr>' + c.table.head.map((x) => '<th scope="col">' + esc(x) + '</th>').join('') + '</tr></thead><tbody>' +
+      c.table.rows.map((r) => '<tr>' + r.map((x, k) => k === 0 ? '<th scope="row">' + esc(x) + '</th>' : '<td>' + esc(x) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+  }
+
+  function renderReview() {
+    const l = S.log[S.review], c = CASES[l.idx], lim = S.phase === 'end' ? S.log.length - 1 : S.i - 1;
+    let h = '<section class="card"><div class="rowtop"><span class="lvl lv' + c.level + '">' + esc(LEVELS[c.level]) + '</span><span class="small">Releyendo el caso ' + (l.idx + 1) + ' de ' + TOTAL + ' · solo lectura</span></div><h2>' + esc(c.title) + '</h2>' +
+      '<div class="scene"><svg viewBox="0 0 240 110" role="img" aria-label="Ilustración del caso: ' + esc(c.title) + '">' + SCENES[c.scene] + '</svg></div>' +
+      '<div class="story"><p>' + fmt(l.intro) + '</p>' + (l.pre ? '<div class="tip"><b>Cuenta pendiente.</b> ' + esc(l.pre) + '</div>' : '') + '</div><div id="tipbox"></div>';
+    if (c.table) h += tableHtml(c);
+    h += '<p class="ask">' + esc(c.ask) + '</p><div class="opts" role="radiogroup" aria-label="Opciones del caso">';
+    l.optsText.forEach((o, k) => {
+      h += '<button type="button" role="radio" class="opt" disabled aria-checked="' + (l.selIdx === k) + '"><span class="k">' + 'ABC'[k] + '</span><span class="t"><strong>' + esc(o.label) + '</strong><span>' + esc(o.detail) + '</span></span></button>';
+    });
+    h += '</div>' + (l.reason ? '<div class="tip"><b>Lo que escribiste.</b> ' + esc(l.reason) + '</div>' : '<p class="small">En este caso no escribiste una explicación.</p>') +
+      '<div class="fb ' + l.tag + '"><h3>' + TAGS[l.tag][0] + '</h3><p>' + fmt(l.fbRaw) + '</p>' +
+      '<div class="chips">' + (l.preDm ? '<span class="chip down">Cuota celular ' + sg(l.preDm) + '</span>' : '') + '<span class="chip ' + (l.dm >= 0 ? 'up' : 'down') + '">Billetera ' + sg(l.dm) + '</span><span class="chip ' + (l.dw >= 0 ? 'up' : 'down') + '">Bienestar ' + (l.dw > 0 ? '+' : '') + l.dw + '</span></div></div>' +
+      '<div class="row">' + (S.review > 0 ? '<button type="button" class="btn alt" id="rv-prev">← Caso anterior</button>' : '') +
+      (S.review < lim ? '<button type="button" class="btn alt" id="rv-next">Caso siguiente →</button>' : '') +
+      '<button type="button" class="btn" id="rv-exit">' + (S.phase === 'end' ? 'Volver al resumen' : 'Volver al caso actual') + '</button></div></section>';
+    main.innerHTML = h;
+  }
+
+  function render() {
+    if (S.phase === 'case') enterCase();
+    hud();
+    if (S.review !== null) renderReview(); else if (S.phase === 'start') renderStart(); else if (S.phase === 'case') renderCase(); else renderEnd();
+  }
+
+  function reset() { Object.assign(S, { phase: 'start', i: 0, money: START_MONEY, wb: 50, flags: {}, log: [], sel: null, answered: false, reason: '', preFor: -1, preNote: null, introText: '', last: null, review: null }); render(); window.scrollTo(0, 0); }
+
+  main.addEventListener('click', (ev) => {
+    const t = ev.target.closest('button'); if (!t) return;
+    if (t.classList.contains('term')) { showTerm(t.dataset.t); return; }
+    const go = (n) => { S.review = n; render(); window.scrollTo(0, 0); main.focus({ preventScroll: true }); };
+    if (t.id === 'reread') { go(S.i - 1); return; }
+    if (t.dataset.rv !== undefined) { go(Number(t.dataset.rv)); return; }
+    if (t.id === 'rv-prev') { go(S.review - 1); return; }
+    if (t.id === 'rv-next') { go(S.review + 1); return; }
+    if (t.id === 'rv-exit') { go(null); return; }
+    if (t.classList.contains('opt') && !S.answered) { pick(Number(t.dataset.k)); return; }
+    if (t.id === 'ok' && S.sel !== null) { confirmChoice(); return; }
+    if (t.id === 'next') {
+      if (S.i === TOTAL - 1) { S.phase = 'end'; } else { S.i++; }
+      render(); window.scrollTo(0, 0); main.focus({ preventScroll: true }); return;
+    }
+    if (t.id === 'again') { reset(); return; }
+    if (t.id === 'copy') copySummary();
+  });
+  main.addEventListener('input', (ev) => { if (ev.target.id === 'why') S.reason = ev.target.value; });
+
+  function pick(k) {
+    S.sel = k;
+    main.querySelectorAll('.opt').forEach((b) => {
+      const on = Number(b.dataset.k) === k;
+      b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
+    });
+    const ok = $('ok'); if (ok) ok.disabled = false;
+  }
+  main.addEventListener('keydown', (ev) => {
+    const t = ev.target.closest && ev.target.closest('.opt'); if (!t || S.answered) return;
+    const n = CASES[S.i].opts.length, k = Number(t.dataset.k); let nk = -1;
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowRight') nk = (k + 1) % n;
+    else if (ev.key === 'ArrowUp' || ev.key === 'ArrowLeft') nk = (k - 1 + n) % n;
+    if (nk < 0) return;
+    ev.preventDefault(); pick(nk); main.querySelector('.opt[data-k="' + nk + '"]').focus();
+  });
+
+  function showTerm(k) {
+    const g = GLOSS[k], box = $('tipbox'); if (!g || !box) return;
+    if (box.dataset.k === k && box.innerHTML) { box.innerHTML = ''; box.dataset.k = ''; return; }
+    box.dataset.k = k; box.innerHTML = '<div class="tip" role="note"><b>' + esc(g[0]) + '.</b> ' + esc(g[1]) + (g[2] ? '<br><b>Ejemplo:</b> ' + esc(g[2]) : '') + '</div>';
+  }
+
+  function copySummary() {
+    const txt = summaryText(), msg = $('copyMsg'), area = $('copyArea');
+    const fallback = () => { area.hidden = false; area.value = txt; area.focus(); area.select(); msg.textContent = 'Selecciona y copia el texto de abajo.'; };
+    try { navigator.clipboard.writeText(txt).then(() => { msg.textContent = 'Resumen copiado.'; }, fallback); } catch (e) { fallback(); }
+  }
+
+  // Herramientas del encabezado
+  $('bGloss').addEventListener('click', () => {
+    const g = $('gloss'); g.hidden = !g.hidden; $('bGloss').setAttribute('aria-expanded', String(!g.hidden));
+    if (!g.hidden) g.scrollIntoView({ block: 'start' });
+  });
+  $('bDoc').addEventListener('click', () => { S.doc = !S.doc; $('bDoc').setAttribute('aria-pressed', String(S.doc)); render(); });
+  const setFs = (d) => { fsi = clamp(fsi + d, 0, FS.length - 1); document.documentElement.style.setProperty('--fs', FS[fsi] + 'px'); };
+  $('bHc').addEventListener('click', () => {
+    const on = !document.documentElement.hasAttribute('data-hc');
+    if (on) document.documentElement.setAttribute('data-hc', '1'); else document.documentElement.removeAttribute('data-hc');
+    $('bHc').setAttribute('aria-pressed', String(on));
+  });
+  $('bMinus').addEventListener('click', () => setFs(-1));
+  $('bPlus').addEventListener('click', () => setFs(1));
+
+  $('glossList').innerHTML = Object.keys(GLOSS).sort((a, b) => GLOSS[a][0].localeCompare(GLOSS[b][0], 'es')).map((k) => '<div><dt>' + esc(GLOSS[k][0]) + '</dt><dd>' + esc(GLOSS[k][1]) + (GLOSS[k][2] ? '<br><b>Ejemplo:</b> ' + esc(GLOSS[k][2]) : '') + '</dd></div>').join('');
+
+  render();
+})();
+
+</script>
+</body>
+</html>
